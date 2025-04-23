@@ -215,7 +215,7 @@ class lie_GUI(QDialog, ui.Ui_Dialog):
         #Landmark
         # self.cfg = yaml.load(open(args.config), Loader=yaml.SafeLoader)
         # self.tddfa = TDDFA(gpu_mode='gpu', **self.cfg)
-        #攝像頭
+
         self.cap = None
         self.countframe = 0
         #timer
@@ -224,3 +224,164 @@ class lie_GUI(QDialog, ui.Ui_Dialog):
 
     def cleartext(self):
         self.Problem.clear()
+        self.Record.clear()
+
+    def Enter_problem(self):
+        the_input = self.Problem.toPlainText()  # 文字框的字
+
+        with open("Result.txt", "a", newline="") as f:
+            f.write("Problem :")
+            f.write(the_input)
+
+        self.time_start()
+
+    def User_0(self):
+        self.User0.setVisible(False)
+        self.User1.setVisible(False)
+        self.User2.setVisible(False)
+        self.index = 0
+        self.userface = self.face_list[self.index]
+        self.userface = np.array(self.userface)
+        self.Startlabel.setVisible(False)
+        self.timer.start()
+        self.RecordStop.setVisible(True)
+
+    def User_1(self):
+        self.User0.setVisible(False)
+        self.User1.setVisible(False)
+        self.User2.setVisible(False)
+        self.index = 1
+        self.userface = self.face_list[self.index]
+        self.userface = np.array(self.userface)
+        self.Startlabel.setVisible(False)
+        self.timer.start()
+        self.RecordStop.setVisible(True)
+
+    def User_2(self):
+        self.User0.setVisible(False)
+        self.User1.setVisible(False)
+        self.User2.setVisible(False)
+        self.index = 2
+        self.userface = self.face_list[self.index]
+        self.userface = np.array(self.userface)
+        self.Startlabel.setVisible(False)
+        self.timer.start()
+        self.RecordStop.setVisible(True)
+
+    def time_start(self):
+        if self.cap is not None:
+            if self.mode == "camera":
+                self.Start.setVisible(False)
+                self.RecordStop.setVisible(True)
+            else:
+                self.Start.setVisible(False)
+                self.RecordStop.setVisible(True)
+                self.videoprogress.setVisible(True)
+
+            self.User0.setVisible(False)
+            self.User1.setVisible(False)
+            self.User2.setVisible(False)
+            self.camera_finish.setVisible(False)
+            self.camera_start.setVisible(False)
+            self.Clear.setVisible(False)
+            self.prob_label.setVisible(False)
+            self.Reset.setVisible(False)
+            self.timer.start()
+            self.truth_lie.setVisible(False)
+            self.A01.setStyleSheet("""color:#c3c3c3""")
+            self.A02.setStyleSheet("""color:#c3c3c3""")
+            self.A04.setStyleSheet("""color:#c3c3c3""")
+            self.A05.setStyleSheet("""color:#c3c3c3""")
+            self.A06.setStyleSheet("""color:#c3c3c3""")
+            self.A09.setStyleSheet("""color:#c3c3c3""")
+            self.A12.setStyleSheet("""color:#c3c3c3""")
+            self.A15.setStyleSheet("""color:#c3c3c3""")
+            self.A17.setStyleSheet("""color:#c3c3c3""")
+            self.A20.setStyleSheet("""color:#c3c3c3""")
+            self.A25.setStyleSheet("""color:#c3c3c3""")
+            self.A26.setStyleSheet("""color:#c3c3c3""")
+            self.Happly_label.setStyleSheet("""color:#c3c3c3""")
+            self.Angry_label.setStyleSheet("""color:#c3c3c3""")
+            self.DIsgust_label.setStyleSheet("""color:#c3c3c3""")
+            self.Fear_label.setStyleSheet("""color:#c3c3c3""")
+            self.Sad_label.setStyleSheet("""color:#c3c3c3""")
+            self.Neutral_label.setStyleSheet("""color:#c3c3c3""")
+            self.Surprise_label.setStyleSheet("""color:#c3c3c3""")
+
+    def record_stop(self):
+        self.timer.stop()
+        if self.mode == "video":
+            self.RecordStop.setVisible(False)
+            self.Start.setVisible(True)
+            self.Finish.setVisible(True)
+        else:
+            self.frame_emb_AU = np.array(self.frame_emb_AU)
+            self.frame_emb_AU = np.mean(self.frame_emb_AU, axis=0)
+            self.log = np.array(self.log)
+            self.log = np.mean(self.log, axis=0)
+            self.show_thread = show(self.frame_embed_list, self.frame_emb_AU, self.log)
+            self.show_thread.start()
+            self.show_thread.trigger.connect(self.display_feature)
+            self.frame_embed_list = []
+            self.frame_emb_AU = []
+            self.log = []
+            self.camera_finish.setVisible(True)
+            _translate = QtCore.QCoreApplication.translate
+            self.camera_start.setText(_translate("Dialog", "Continue"))
+            self.camera_start.setVisible(True)
+            self.Clear.setVisible(True)
+            self.RecordStop.setVisible(False)
+            self.camera_finish.setVisible(True)
+
+        self.Reset.setVisible(False)
+
+        if self.lie_count > 0:
+            lie_prob = round((self.lie_prob_count / self.lie_count) * 100)
+            self.RecordStop.setVisible(False)
+            self.prob_label.setVisible(True)
+            self.prob_label.setText(
+                "The probability of deception: {:.0f}% ".format(lie_prob)
+            )
+
+    def start_webcam(self):
+        self.lie_count = 0
+        self.lie_prob_count = 0
+        self.loadvideo.setVisible(False)
+        self.loadcamera.setVisible(False)
+        # self.Start.setVisible(True)
+        self.Reset.setVisible(True)
+        if self.cap is None:
+            self.Startlabel.setVisible(False)
+            self.cap = cv2.VideoCapture(0)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.mode = "camera"
+            self.Problem.setVisible(True)
+            self.Record.setVisible(True)
+            self.Record_area.setVisible(True)
+
+            self.Clear.setVisible(True)
+            self.camera_start.setVisible(True)
+        with open("Result.txt", "w", newline="") as f:
+            f.write("\t\t\t\t\t\tReport\n")
+
+    def get_image_file(self):
+        self.lie_count = 0
+        self.lie_prob_count = 0
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Open Video File", r"<Default dir>", "Video files (*.mp4 *.avi)"
+        )
+        if self.cap is None and file_name != "":
+            self.Startlabel.setVisible(False)
+            self.loadvideo.setVisible(False)
+            self.loadcamera.setVisible(False)
+            self.Start.setVisible(True)
+            self.filename.setVisible(True)
+            self.Finish.setVisible(False)
+            self.Reset.setVisible(True)
+            self.filename.setText(
+                "        Current file:\n{:^29}".format(file_name.split("/")[-1])
+            )
+            self.cap = cv2.VideoCapture(file_name)
+            self.frame_total = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            self.mode = "video"
