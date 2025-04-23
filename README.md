@@ -23,7 +23,6 @@ Our deception detection system comprises four parts：
 1. 3D landmarks displacement
 2. Emotion Unit
 3. Action Unit
-4. Emotion Audio unit
 
 ### Install Packages
 
