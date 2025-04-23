@@ -885,3 +885,99 @@ def wide_resnet(arch, block, layers, pretrained, num_classes, progress, **kwargs
             pretrained_dict = models.wide_resnet50_2(pretrained = pretrained)
         elif arch == 'wide_resnet101_2':
             pretrained_dict = models.wide_resnet101_2(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+def wide_resnet50_2(pretrained=False, num_classes=1000, progress=True, **kwargs):
+    r"""Wide ResNet-50-2 model from
+    `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_
+    The model is the same as ResNet except for the bottleneck number of channels
+    which is twice larger in every block. The number of channels in outer 1x1
+    convolutions is the same, e.g. last block in ResNet-50 has 2048-512-2048
+    channels, and in Wide ResNet-50-2 has 2048-1024-2048.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    kwargs['width_per_group'] = 64 * 2
+    return wide_resnet('wide_resnet50_2', wide_Bottleneck, [3, 4, 6, 3], pretrained, num_classes, progress, **kwargs)
+ 
+def wide_resnet101_2(pretrained=False, num_classes=1000, progress=True, **kwargs):
+    r"""Wide ResNet-101-2 model from
+    `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_
+    The model is the same as ResNet except for the bottleneck number of channels
+    which is twice larger in every block. The number of channels in outer 1x1
+    convolutions is the same, e.g. last block in ResNet-50 has 2048-512-2048
+    channels, and in Wide ResNet-50-2 has 2048-1024-2048.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    kwargs['width_per_group'] = 64 * 2
+    return wide_resnet('wide_resnet101_2', wide_Bottleneck, [3, 4, 23, 3],pretrained, progress, **kwargs)
+# ------------------------------------------------------------------------------
+def select_model(args):
+    if args.model_name == 'resnet18':
+        if args.isPretrain == False :
+            model = resnet18(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = resnet18(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'resnet50':
+        if args.isPretrain == False :
+            model = resnet50(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = resnet50(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'resnet101':
+        if args.isPretrain == False :
+            model = resnet101(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = resnet101(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'se_resnet50':
+        if args.isPretrain == False :
+            model = se_resnet50(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = se_resnet50(args = args, num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'se_resnet101':
+        if args.isPretrain == False :
+            model = se_resnet101(num_classes = args.num_classes)
+        else:
+            model = se_resnet101(num_classes = args.num_classes)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'se_resneXt50':
+        if args.isPretrain == False :
+            model = se_resnext50(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = se_resnext50(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'se_resneXt101':
+        if args.isPretrain == False :
+            model = se_resnext101(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = se_resnext101(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'wide_resnet50':
+        if args.isPretrain == False :
+            model = wide_resnet50_2(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = wide_resnet50_2(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)
+    elif args.model_name == 'wide_resnet101':
+        if args.isPretrain == False :
+            model = wide_resnet101_2(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+        else:
+            model = wide_resnet101_2(num_classes = args.num_classes, pretrained = args.pretrained_weight)
+            model = torch.load(args.save_model + '/' + args.pretrain_model)    
+    model = model.cuda()
+    if len(args.gpu_id.split(',')) > 1 :
+        model = nn.DataParallel(model)
+    return model
