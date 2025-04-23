@@ -91,3 +91,136 @@ class Landmark:
             res = cv_draw_landmark(self.image, ver,color=self.color)
         elif args.opt == '3d':
             res = render(self.image, [ver])
+        else:
+            raise Exception(f'Unknown opt {args.opt}')
+        
+        lnd = ver.T
+        # D1_i = np.sqrt(np.square(lnd[61][0]-lnd[67][0]) + np.square(lnd[61][1]-lnd[67][1]))
+        # D1_o = np.sqrt(np.square(lnd[50][0]-lnd[58][0]) + np.square(lnd[50][1]-lnd[58][1]))
+        # D2_i = np.sqrt(np.square(lnd[62][0]-lnd[66][0]) + np.square(lnd[62][1]-lnd[66][1]))
+        # D2_o = np.sqrt(np.square(lnd[51][0]-lnd[57][0]) + np.square(lnd[51][1]-lnd[57][1]))
+        # D3_i = np.sqrt(np.square(lnd[63][0]-lnd[65][0]) + np.square(lnd[63][1]-lnd[65][1]))
+        # D3_o = np.sqrt(np.square(lnd[52][0]-lnd[56][0]) + np.square(lnd[52][1]-lnd[56][1]))
+        res = res[int(roi_box_lst[0][1]):int(roi_box_lst[0][3]), int(roi_box_lst[0][0]):int(roi_box_lst[0][2])]
+        # pm_ratio_1 = D1_i / D1_o
+        # pm_ratio_2 = D2_i / D2_o
+        # pm_ratio_3 = D3_i / D3_o
+        # print('pm1:',pm_ratio_1)
+        # print('pm2:',pm_ratio_2)
+        # print('pm3:',pm_ratio_3)
+        if res.shape[0] != 0 and res.shape[1] != 0:
+            img_res = cv2.resize(res,(224,224))
+        else:
+            img_res = np.array([None])
+        return img_res
+
+#AU_pred thread
+class AU_pred(QThread):
+    trigger = pyqtSignal(list,list)
+    def  __init__ (self,image):
+        super(AU_pred ,self). __init__ ()
+        self.face = image
+    def run(self):
+        logps, emb = Action_class._pred(self.face,Config)
+        self.trigger.emit(emb.tolist(),logps.tolist())
+
+class show(QThread):
+    trigger = pyqtSignal(list,list,int)
+    def  __init__ (self, frame_list ,frame_AU,log):
+        super(show,self). __init__ ()
+        self.frame_embed_list = frame_list
+        self.frame_emb_AU = frame_AU
+        self.log = log
+    def pred(self):
+        #Action calculation
+        AU_list = self.log.tolist()[0]
+        for index,i in enumerate(AU_list):
+            if i >= 0.01:
+                AU_list[index] = 1
+            else:
+                AU_list[index] = 0
+        
+        pred_score, self_embedding, relation_embedding = Emotion_class.validate(self.frame_embed_list) # Emotion_pred
+        feature = np.concatenate((self.frame_emb_AU,relation_embedding.cpu().numpy()), axis = 1)
+        results = SVM_model.predict(feature) # Lie_pred
+        return AU_list, pred_score, results
+    def run(self):
+        logps,  pred_score, results  = self.pred()
+        self.trigger.emit(logps,  pred_score.tolist(), results)
+        
+
+class lie_GUI(QDialog, ui.Ui_Dialog):
+    def __init__(self, args):
+        super(lie_GUI, self).__init__()
+        print('Start deception detection')
+        import qdarkstyle
+        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+        self.mouth_count = 0
+        self.frame_embed_list = [] # 儲存人臉
+        self.frame_emb_AU = []
+        self.log = []
+        self.userface =[]
+        self.color = (0, 255, 0)
+        self.index = 0
+        self.len_bbox = 1
+        self.time = None 
+        #Qt_design
+        self.setupUi(self)
+        self.Startlabel.setText('Press the button to upload a video or activate camera')
+        self.Problem.setPlaceholderText('Enter the question')
+        self.Record.setPlaceholderText('Enter the description')
+        #hidden button
+        self.Reset.setVisible(False)
+        self.Finish.setVisible(False)
+        self.truth_lie.setVisible(False)
+        self.prob_label.setVisible(False)
+        self.Start.setVisible(False)
+        self.RecordStop.setVisible(False)
+        self.filename.setVisible(False)
+        self.videoprogress.setVisible(False)
+        self.User0.setVisible(False)
+        self.User1.setVisible(False)
+        self.User2.setVisible(False)
+        self.Record_area.setVisible(False)
+        self.Problem.setVisible(False)
+        self.Record.setVisible(False)
+        # self.Export.setVisible(False)
+        self.camera_start.setVisible(False)
+        self.Clear.setVisible(False)
+        self.camera_finish.setVisible(False)
+        #set style
+        self.videoprogress.setStyleSheet("QProgressBar::chunk ""{""background-color: white;""}") ##4183c5
+        #button click
+        self.loadcamera.clicked.connect(self.start_webcam)
+        self.loadvideo.clicked.connect(self.get_image_file)
+        self.Reset.clicked.connect(self.Reset_but)
+        self.Finish.clicked.connect(self.Reset_but)
+        self.camera_finish.clicked.connect(self.Reset_but)
+        self.Start.clicked.connect(self.time_start)
+        self.RecordStop.clicked.connect(self.record_stop)
+        self.camera_start.clicked.connect(self.Enter_problem)
+        self.Clear.clicked.connect(self.cleartext)
+        self.User0.clicked.connect(self.User_0)
+        self.User1.clicked.connect(self.User_1)
+        self.User2.clicked.connect(self.User_2)
+        #button icon
+        self.loadvideo.setIcon(QIcon('./icon/youtube.png')) # set button icon
+        self.loadvideo.setIconSize(QSize(50,50)) # set icon size
+        self.loadcamera.setIcon(QIcon('./icon/camera.png')) # set button icon
+        self.loadcamera.setIconSize(QSize(50,50)) # set icon size
+        self.Reset.setIcon(QIcon('./icon/reset.png')) # set button icon
+        self.Reset.setIconSize(QSize(60,60)) # set icon size
+        self.RecordStop.setIcon(QIcon('./icon/stop.png')) # set button icon
+        self.RecordStop.setIconSize(QSize(30,30)) # set icon size
+        #Landmark
+        # self.cfg = yaml.load(open(args.config), Loader=yaml.SafeLoader)
+        # self.tddfa = TDDFA(gpu_mode='gpu', **self.cfg)
+        #攝像頭
+        self.cap = None
+        self.countframe = 0
+        #timer
+        self.timer = QTimer(self, interval=0)
+        self.timer.timeout.connect(self.update_frame)
+
+    def cleartext(self):
+        self.Problem.clear()
