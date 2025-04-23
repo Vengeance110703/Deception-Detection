@@ -385,3 +385,441 @@ class lie_GUI(QDialog, ui.Ui_Dialog):
             self.cap = cv2.VideoCapture(file_name)
             self.frame_total = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
             self.mode = "video"
+    def face_recognition(self, bbox, img):
+        self.Original.setPixmap(QPixmap(""))
+        # self.Facealignment.setPixmap(QPixmap(""))
+        # self.Landmark.setPixmap(QPixmap(""))
+
+        qformat = QImage.Format_Indexed8
+        if len(img.shape) == 3:
+            if img.shape[2] == 4:
+                qformat = QImage.Format_RGBA8888
+            else:
+                qformat = QImage.Format_RGB888
+        img_raw = QImage(img, img.shape[1], img.shape[0], img.strides[0], qformat)
+        img_raw = img_raw.rgbSwapped()
+        self.Original.setPixmap(QPixmap.fromImage(img_raw))
+
+        self.Startlabel.setVisible(True)
+        self.RecordStop.setVisible(False)
+
+        if len(bbox) == 2:
+            op0 = QGraphicsOpacityEffect()
+            op0.setOpacity(0)
+            op1 = QGraphicsOpacityEffect()
+            op1.setOpacity(0)
+            self.User0.setGraphicsEffect(op0)
+            self.User1.setGraphicsEffect(op1)
+            self.User0.setGeometry(QtCore.QRect(bbox[0][0], bbox[0][1] + 25, 251, 91))
+            self.User1.setGeometry(QtCore.QRect(bbox[1][0], bbox[1][1] + 25, 251, 91))
+            self.User0.setVisible(True)
+            self.User1.setVisible(True)
+
+        elif len(bbox) == 3:
+            op0 = QGraphicsOpacityEffect()
+            op0.setOpacity(0)
+            op1 = QGraphicsOpacityEffect()
+            op1.setOpacity(0)
+            op2 = QGraphicsOpacityEffect()
+            op2.setOpacity(0)
+            self.User0.setGraphicsEffect(op0)
+            self.User1.setGraphicsEffect(op1)
+            self.User0.setGeometry(QtCore.QRect(bbox[0][0], bbox[0][1] + 25, 251, 91))
+            self.User1.setGeometry(QtCore.QRect(bbox[1][0], bbox[1][1] + 25, 251, 91))
+            self.User2.setGeometry(QtCore.QRect(bbox[2][0], bbox[2][1] + 25, 251, 91))
+            self.User0.setVisible(True)
+            self.User1.setVisible(True)
+            self.User2.setVisible(True)
+        self.Startlabel.setText("Choose the user you want to detect!")
+
+    def update_frame(self):
+        ret, im = self.cap.read()
+        im = cv2.resize(im, (640, 480), interpolation=cv2.INTER_AREA)
+        self.im = im
+        show_img = im.copy()
+        self.countframe += 1
+        # 影片讀條
+        if self.mode == "video":
+            self.videoprogress.setValue(
+                (round(self.countframe / self.frame_total, 2) * 100)
+            )
+
+        image = skimage.img_as_float(im).astype(np.float32)
+        frame = img_as_ubyte(image)
+        self.img_raw, output_raw, output_points, bbox, self.face_list = (
+            Retina.detect_face(frame)
+        )  # face detection
+        # 若只有一個臉，正常顯示
+        if len(bbox) == 1:
+            self.index = 0
+            self.userface = self.face_list[self.index]
+            self.len_bbox = 1
+        elif len(bbox) >= 2:
+            if len(self.userface):
+                dist_list = []
+                self.face_list = np.array(self.face_list)
+                for i in range(len(bbox)):
+                    dist = np.sqrt(
+                        np.sum(
+                            np.square(
+                                np.subtract(self.userface[:], self.face_list[i, :])
+                            )
+                        )
+                    )
+                    dist_list.append(dist)
+                dist_list = np.array(dist_list)
+                self.index = np.argmin(dist_list)
+
+        if len(output_points):
+            # face_align
+            out_raw = align_face(
+                output_raw, output_points[self.index], crop_size_h=112, crop_size_w=112
+            )
+            out_raw = cv2.resize(out_raw, (224, 224))
+            # Landmark
+            # _landmark = Landmark(im,bbox,self.cfg,self.tddfa,self.color)
+            # landmark_img = _landmark.main(self.index)
+
+            cv2.rectangle(
+                show_img,
+                (bbox[self.index][0], bbox[self.index][1]),
+                (bbox[self.index][2], bbox[self.index][3]),
+                (0, 0, 255),
+                2,
+            )
+            self.face_align = out_raw
+            self.bbox = bbox
+            self.displayImage(show_img, bbox, True)
+            self.frame_embed_list.append(out_raw)  # 儲存人臉
+            # 計算AU
+            self.lnd_AU = AU_pred(out_raw)
+            self.lnd_AU.start()
+            self.lnd_AU.trigger.connect(self.AU_store)
+        # 沒有臉的時候
+        else:
+            self.frame_embed_list = []
+            self.frame_emb_AU = []
+            self.log = []
+            self.A01.setStyleSheet("""color:#e8e8e8""")  # #e8e8e8
+            self.A02.setStyleSheet("""color:#e8e8e8""")
+            self.A04.setStyleSheet("""color:#e8e8e8""")
+            self.A05.setStyleSheet("""color:#e8e8e8""")
+            self.A06.setStyleSheet("""color:#e8e8e8""")
+            self.A09.setStyleSheet("""color:#e8e8e8""")
+            self.A12.setStyleSheet("""color:#e8e8e8""")
+            self.A15.setStyleSheet("""color:#e8e8e8""")
+            self.A17.setStyleSheet("""color:#e8e8e8""")
+            self.A20.setStyleSheet("""color:#e8e8e8""")
+            self.A25.setStyleSheet("""color:#e8e8e8""")
+            self.A26.setStyleSheet("""color:#e8e8e8""")
+            self.Happly_label.setStyleSheet("""color:#e8e8e8""")
+            self.Angry_label.setStyleSheet("""color:#e8e8e8""")
+            self.DIsgust_label.setStyleSheet("""color:#e8e8e8""")
+            self.Fear_label.setStyleSheet("""color:#e8e8e8""")
+            self.Sad_label.setStyleSheet("""color:#e8e8e8""")
+            self.Neutral_label.setStyleSheet("""color:#e8e8e8""")
+            self.Surprise_label.setStyleSheet("""color:#e8e8e8""")
+            self.truth_lie.setVisible(False)
+            self.displayImage(im, face_num=None)
+
+    def AU_store(self, AU_emb, log):
+        AU_emb = torch.FloatTensor(AU_emb)
+        log = torch.FloatTensor(log)
+        # print(log)
+        self.frame_emb_AU.append(AU_emb.cpu().numpy())
+        self.log.append(log.cpu().numpy())
+
+    def displayImage(self, img, bbox=None, face_num=None):
+        # 定義參數
+        qformat = QImage.Format_Indexed8
+        if len(img.shape) == 3:
+            if img.shape[2] == 4:
+                qformat = QImage.Format_RGBA8888
+            else:
+                qformat = QImage.Format_RGB888
+        # 顯示影像
+        if face_num:
+            img_raw = QImage(img, img.shape[1], img.shape[0], img.strides[0], qformat)
+            img_raw = img_raw.rgbSwapped()
+            # if lnd_img.any() != None:
+            #     landmark_image = QImage(lnd_img, lnd_img.shape[1], lnd_img.shape[0], lnd_img.strides[0], qformat)
+            #     landmark_image = landmark_image.rgbSwapped()
+            #     self.Landmark.setPixmap(QPixmap.fromImage(landmark_image))
+
+            # align_img = QImage(face_align, face_align.shape[1], face_align.shape[0], face_align.strides[0], qformat)
+            # align_img = align_img.rgbSwapped()
+
+            self.Original.setPixmap(QPixmap.fromImage(img_raw))
+            # self.Facealignment.setPixmap(QPixmap.fromImage(align_img))
+
+            # 若大於兩個人，則選擇要哪個人
+            if len(bbox) >= 2 and self.len_bbox != len(bbox):
+                self.frame_embed_list = []
+                self.frame_emb_AU = []
+                self.log = []
+                self.len_bbox = len(bbox)
+                self.timer.stop()
+                self.face_recognition(bbox, self.img_raw)
+            # 若是影片，則len_cut禎計算一次結果
+            if self.mode == "video":
+                if len(self.frame_embed_list) == args.len_cut:
+                    self.frame_emb_AU = np.array(self.frame_emb_AU)
+                    self.frame_emb_AU = np.mean(self.frame_emb_AU, axis=0)
+                    self.log = np.array(self.log)
+                    self.log = np.mean(self.log, axis=0)
+                    self.show_thread = show(
+                        self.frame_embed_list, self.frame_emb_AU, self.log
+                    )
+                    self.show_thread.start()
+                    self.show_thread.trigger.connect(self.display_feature)
+                    self.frame_embed_list = []
+                    self.frame_emb_AU = []
+                    self.log = []
+
+        else:
+            img_raw = QImage(img, img.shape[1], img.shape[0], img.strides[0], qformat)
+            img_raw = img_raw.rgbSwapped()
+            self.Original.setPixmap(QPixmap.fromImage(img_raw))
+            # self.Facealignment.setPixmap(QPixmap(""))
+            # self.Landmark.setPixmap(QPixmap(""))
+            if self.mode == "camera":
+                self.countframe = 0
+
+        if self.mode == "video":
+            if self.countframe == self.frame_total:
+                self.prob_label.setVisible(True)
+                self.RecordStop.setVisible(False)
+                self.Reset.setVisible(True)
+                if self.lie_count != 0:
+                    lie_prob = round((self.lie_prob_count / self.lie_count) * 100)
+                    self.prob_label.setText(
+                        "The probability of deception: {:.0f}% ".format(lie_prob)
+                    )
+                self.timer.stop()
+
+    def display_feature(self, logps, pred_score, results):
+        pred_score = torch.Tensor(pred_score)
+        # intialization
+        self.A01.setStyleSheet("""color:#c3c3c3""")
+        self.A02.setStyleSheet("""color:#c3c3c3""")
+        self.A04.setStyleSheet("""color:#c3c3c3""")
+        self.A05.setStyleSheet("""color:#c3c3c3""")
+        self.A06.setStyleSheet("""color:#c3c3c3""")
+        self.A09.setStyleSheet("""color:#c3c3c3""")
+        self.A12.setStyleSheet("""color:#c3c3c3""")
+        self.A15.setStyleSheet("""color:#c3c3c3""")
+        self.A17.setStyleSheet("""color:#c3c3c3""")
+        self.A20.setStyleSheet("""color:#c3c3c3""")
+        self.A25.setStyleSheet("""color:#c3c3c3""")
+        self.A26.setStyleSheet("""color:#c3c3c3""")
+        self.Happly_label.setStyleSheet("""color:#c3c3c3""")
+        self.Angry_label.setStyleSheet("""color:#c3c3c3""")
+        self.DIsgust_label.setStyleSheet("""color:#c3c3c3""")
+        self.Fear_label.setStyleSheet("""color:#c3c3c3""")
+        self.Sad_label.setStyleSheet("""color:#c3c3c3""")
+        self.Neutral_label.setStyleSheet("""color:#c3c3c3""")
+        self.Surprise_label.setStyleSheet("""color:#c3c3c3""")
+        self.truth_lie.setText("")
+
+        if results == 1:
+            self.color = (0, 0, 255)  # red
+            self.truth_lie.setText("Deception!")
+            self.truth_lie.setStyleSheet(
+                """QPushButton{background:#fff;border-radius:5px;color: red;}"""
+            )
+            self.truth_lie.setVisible(True)
+            self.lie_prob_count += 1
+            # Emotion unit
+            if pred_score.cpu().numpy().argmax() == 0:
+                self.Happly_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 1:
+                self.Angry_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 2:
+                self.DIsgust_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 3:
+                self.Fear_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 4:
+                self.Sad_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 5:
+                self.Neutral_label.setStyleSheet("""color:red""")
+            elif pred_score.cpu().numpy().argmax() == 6:
+                self.Surprise_label.setStyleSheet("""color:red""")
+            # Action unit
+            if logps[0] == 1:
+                self.A01.setStyleSheet("""color:red""")
+            if logps[1] == 1:
+                self.A02.setStyleSheet("""color:red""")
+            if logps[2] == 1:
+                self.A04.setStyleSheet("""color:red""")
+            if logps[3] == 1:
+                self.A05.setStyleSheet("""color:red""")
+            if logps[4] == 1:
+                self.A06.setStyleSheet("""color:red""")
+            if logps[5] == 1:
+                self.A09.setStyleSheet("""color:red""")
+            if logps[6] == 1:
+                self.A12.setStyleSheet("""color:red""")
+            if logps[7] == 1:
+                self.A15.setStyleSheet("""color:red""")
+            if logps[8] == 1:
+                self.A17.setStyleSheet("""color:red""")
+            if logps[9] == 1:
+                self.A20.setStyleSheet("""color:red""")
+            if logps[10] == 1:
+                self.A25.setStyleSheet("""color:red""")
+            if logps[11] == 1:
+                self.A26.setStyleSheet("""color:red""")
+
+        else:
+            self.color = (0, 255, 0)  # green
+            self.truth_lie.setText("Truth!")
+            self.truth_lie.setStyleSheet(
+                """QPushButton{background:#fff;border-radius:5px;color: green;}"""
+            )
+            self.truth_lie.setVisible(True)
+            # Emotion unit
+            if pred_score.cpu().numpy().argmax() == 0:
+                self.Happly_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 1:
+                self.Angry_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 2:
+                self.DIsgust_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 3:
+                self.Fear_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 4:
+                self.Sad_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 5:
+                self.Neutral_label.setStyleSheet("""color:green""")
+            elif pred_score.cpu().numpy().argmax() == 6:
+                self.Surprise_label.setStyleSheet("""color:green""")
+            # Action unit
+            if logps[0] == 1:
+                self.A01.setStyleSheet("""color:green""")
+            if logps[1] == 1:
+                self.A02.setStyleSheet("""color:green""")
+            if logps[2] == 1:
+                self.A04.setStyleSheet("""color:green""")
+            if logps[3] == 1:
+                self.A05.setStyleSheet("""color:green""")
+            if logps[4] == 1:
+                self.A06.setStyleSheet("""color:green""")
+            if logps[5] == 1:
+                self.A09.setStyleSheet("""color:green""")
+            if logps[6] == 1:
+                self.A12.setStyleSheet("""color:green""")
+            if logps[7] == 1:
+                self.A15.setStyleSheet("""color:green""")
+            if logps[8] == 1:
+                self.A17.setStyleSheet("""color:green""")
+            if logps[9] == 1:
+                self.A20.setStyleSheet("""color:green""")
+            if logps[10] == 1:
+                self.A25.setStyleSheet("""color:green""")
+            if logps[11] == 1:
+                self.A26.setStyleSheet("""color:green""")
+
+        self.frame_embed_list = []
+        self.frame_emb_AU = []
+        self.lie_count += 1
+        if self.mode == "camera":
+            self.countframe = 0
+            with open("Result.txt", "a", newline="") as f:
+
+                f.write("\nEmotion unit:")
+                if pred_score.cpu().numpy().argmax() == 0:
+                    f.write("Happy")
+                elif pred_score.cpu().numpy().argmax() == 1:
+                    f.write("Angry")
+                elif pred_score.cpu().numpy().argmax() == 2:
+                    f.write("Disgust")
+                elif pred_score.cpu().numpy().argmax() == 3:
+                    f.write("Fear")
+                elif pred_score.cpu().numpy().argmax() == 4:
+                    f.write("Sad")
+                elif pred_score.cpu().numpy().argmax() == 5:
+                    f.write("Neutral")
+                elif pred_score.cpu().numpy().argmax() == 6:
+                    f.write("Surprise")
+
+                f.write("\nAction unit:")
+                if logps[0] == 1:
+                    f.write("Inner brow raiser\t")
+                if logps[1] == 1:
+                    f.write("Outer brow raiser\t")
+                if logps[2] == 1:
+                    f.write("Brow lower\t")
+                if logps[3] == 1:
+                    f.write("Upper Lid Raiser\t")
+                if logps[4] == 1:
+                    f.write("Cheek raiser\t")
+                if logps[5] == 1:
+                    f.write("Nose wrinkle\t")
+                if logps[6] == 1:
+                    f.write("Lip corner puller\t")
+                if logps[7] == 1:
+                    f.write("Lip corner depressor\t")
+                if logps[8] == 1:
+                    f.write("Chin raiser\t")
+                if logps[9] == 1:
+                    f.write("Lip Stretcher\t")
+                if logps[10] == 1:
+                    f.write("Lips part\t")
+                if logps[11] == 1:
+                    f.write("Jaw drop\t")
+
+                f.write("\nLie detection:")
+                if results == 1:
+                    f.write("Deception!")
+                else:
+                    f.write("Truth!")
+                the_output = self.Record.toPlainText()
+                f.write("\nDescription:")
+                f.write(the_output)
+                f.write("\n\n")
+
+            # _landmark = Landmark(self.im,self.bbox,self.cfg,self.tddfa,self.color)
+            # lnd_img = _landmark.main(self.index)
+            qformat = QImage.Format_Indexed8
+            if len(self.im.shape) == 3:
+                if self.im.shape[2] == 4:
+                    qformat = QImage.Format_RGBA8888
+                else:
+                    qformat = QImage.Format_RGB888
+            # if lnd_img.any() != None:
+            #     landmark_image = QImage(lnd_img, lnd_img.shape[1], lnd_img.shape[0], lnd_img.strides[0], qformat)
+            #     landmark_image = landmark_image.rgbSwapped()
+            #     self.Landmark.setPixmap(QPixmap.fromImage(landmark_image))
+
+    def Reset_but(self):
+        self.Reset.setVisible(False)
+        self.camera_finish.setVisible(False)
+        self.Finish.setVisible(False)
+        self.truth_lie.setVisible(False)
+        self.videoprogress.setVisible(False)
+        self.filename.setVisible(False)
+        self.loadcamera.setVisible(True)
+        self.loadvideo.setVisible(True)
+        self.Startlabel.setVisible(True)
+        self.Start.setVisible(False)
+        self.prob_label.setVisible(False)
+        self.Problem.setVisible(False)
+        self.Record_area.setVisible(False)
+        self.Record.setVisible(False)
+        self.camera_start.setVisible(False)
+        self.Clear.setVisible(False)
+        _translate = QtCore.QCoreApplication.translate
+        self.camera_start.setText(_translate("Dialog", "Start"))
+        self.Problem.clear()
+        self.Record.clear()
+        self.A01.setStyleSheet("""color:#c3c3c3""")
+        self.A02.setStyleSheet("""color:#c3c3c3""")
+        self.A04.setStyleSheet("""color:#c3c3c3""")
+        self.A05.setStyleSheet("""color:#c3c3c3""")
+        self.A06.setStyleSheet("""color:#c3c3c3""")
+        self.A09.setStyleSheet("""color:#c3c3c3""")
+        self.A12.setStyleSheet("""color:#c3c3c3""")
+        self.A15.setStyleSheet("""color:#c3c3c3""")
+        self.A17.setStyleSheet("""color:#c3c3c3""")
+        self.A20.setStyleSheet("""color:#c3c3c3""")
+        self.A25.setStyleSheet("""color:#c3c3c3""")
+        self.A26.setStyleSheet("""color:#c3c3c3""")
