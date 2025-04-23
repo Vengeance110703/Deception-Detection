@@ -823,3 +823,37 @@ class lie_GUI(QDialog, ui.Ui_Dialog):
         self.A20.setStyleSheet("""color:#c3c3c3""")
         self.A25.setStyleSheet("""color:#c3c3c3""")
         self.A26.setStyleSheet("""color:#c3c3c3""")
+        self.Happly_label.setStyleSheet("""color:#c3c3c3""")
+        self.Angry_label.setStyleSheet("""color:#c3c3c3""")
+        self.DIsgust_label.setStyleSheet("""color:#c3c3c3""")
+        self.Fear_label.setStyleSheet("""color:#c3c3c3""")
+        self.Sad_label.setStyleSheet("""color:#c3c3c3""")
+        self.Neutral_label.setStyleSheet("""color:#c3c3c3""")
+        self.Surprise_label.setStyleSheet("""color:#c3c3c3""")
+        self.color = (0, 255, 0)
+        self.truth_lie.setText("Lie_truth")
+        # self.truth_lie.setStyleSheet('''QPushButton{background:##ff70ff;border-radius:5px;}''')
+        self.videoprogress.setValue(0)
+        self.frame_embed_list = []
+        self.frame_emb_AU = []
+        self.userface = []
+        self.countframe = 0
+        self.index = 0
+        self.len_bbox = 1
+        self.Original.setPixmap(QPixmap(""))
+        # self.Facealignment.setPixmap(QPixmap(""))
+        # self.Landmark.setPixmap(QPixmap(""))
+        self.filename.setText("")
+        self.Startlabel.setText("Press the button to upload a video or activate camera")
+        # self.Facedetection.setPixmap(QPixmap(""))
+        self.timer.stop()
+        if self.cap != None:
+            self.cap.release()
+            self.cap = None
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = lie_GUI(args)
+    window.show()
+    sys.exit(app.exec_())
