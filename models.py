@@ -140,3 +140,156 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.dropout = nn.Dropout(0.5)
+        if args.model_name == 'resnet18':
+            self.fclass = nn.Linear(512, args.num_classes)
+        else:
+            self.fclass = nn.Linear(2048, args.num_classes)
+        self.bn2 = nn.BatchNorm1d(num_classes)
+        # self.relu2 = nn.ReLU(inplace=True)
+        # self.sigmoid = nn.Sigmoid()
+        # self.tanh = nn.Tanh()
+        # self.softmax = nn.Softmax()
+        # self.swish = Swish()
+        # self.mish = Mish()
+        self.Stanh = Shift_tanh()
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+ 
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+ 
+        return nn.Sequential(*layers)
+ 
+    def forward(self, x, args):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        
+        layer1 = self.layer1(x)
+        layer2 = self.layer2(layer1)
+        layer3 = self.layer3(layer2)
+        layer4 = self.layer4(layer3)
+
+        x = self.avgpool(layer4)
+
+        x = self.dropout(x)
+        embedding = x.view(x.size(0), -1)
+        x = self.fclass(embedding)
+        if args.loss_func == 'MSE' or args.loss_func == 'L1':
+            x = self.bn2(x)
+            x = self.Stanh(x)
+        return x, embedding
+
+def resnet18(args, num_classes, pretrained=False):
+    """Constructs a ResNet-18 model.
+    Args:
+        num_classes = 1000 (default)
+    """
+    model = ResNet(args = args, block = BasicBlock, layers = [2, 2, 2, 2], num_classes = num_classes)
+    if pretrained:
+        pretrained_dict = models.resnet18(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+def resnet34(args, num_classes, pretrained=False):
+    """Constructs a ResNet-34 model.
+    Args:
+        num_classes = 1000 (default)
+    """
+    model = ResNet(args = args, block = BasicBlock, layers = [3, 4, 6, 3], num_classes = num_classes)
+    if pretrained:
+        pretrained_dict = models.resnet34(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+def resnet50(args, num_classes, pretrained=False):
+    """Constructs a ResNet-50 model.
+    Args:
+        num_classes = 1000 (default)
+    """
+    model = ResNet(args = args, block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes)
+    if pretrained:
+        pretrained_dict = models.resnet50(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+def resnet101(args, num_classes, pretrained=False):
+    """Constructs a ResNet-101 model.
+    Args:
+        num_classes = 1000 (default)
+    """
+    model = ResNet(args = args, block = Bottleneck, layers = [3, 4, 23, 3], num_classes = num_classes)
+    if pretrained:
+        pretrained_dict = models.resnet101(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+def resnet152(args, num_classes, pretrained=False):
+    """Constructs a ResNet-152 model.
+    Args:
+        num_classes = 1000 (default)
+    """
+    model = ResNet(args = args, block = Bottleneck, layers = [3, 8, 36, 3], num_classes = num_classes)
+    if pretrained:
+        pretrained_dict = models.resnet152(pretrained = pretrained)
+        num_ftrs = pretrained_dict.fc.in_features
+        pretrained_dict.fc = nn.Linear(num_ftrs, num_classes)
+        pretrained_dict = pretrained_dict.state_dict()
+        model_dict = model.state_dict()
+        pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+    return model
+
+#---------------------------------------------------------------------------
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
